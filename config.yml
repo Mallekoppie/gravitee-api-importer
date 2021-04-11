@@ -1,0 +1,80 @@
+platform:
+  component:
+    componentname: Gravitee.io API Importer
+  log:
+    # debug
+    # info
+    # warn
+    # error
+    level: info
+    filepath: "./log.txt"
+  http:
+    server:
+      listeningaddress: 0.0.0.0:9111
+      tlscertfilename: ""
+      tlskeyfilename: ""
+      tlsenabled: false
+    clients:
+    - id: default
+      tlsverify: false
+      maxidleconnections: 10
+      requesttimeout: 10
+    - id: custom
+      tlsverify: false
+      maxidleconnections: 10
+      requesttimeout: 10
+  auth:
+    server:
+      oauth:
+        enabled: false
+        idpwellknownurl: ""
+        clientid: ""
+        allowedalgorithms:
+        - rs256
+        - rs384
+      # Basic Auth adds 75 - 80 ms to the response time - queue sad face :(
+      # Passwords must be hashed using bcrypt. Unencrypted passwords will not work
+      basic:
+        enabled: false
+        allowedusers:
+          test: $2a$10$zX3HVDhKWRg2YWrf5VuHYutOOfj4DY.Wk7CsFgEFNgFmQqKBEumJG
+          user2: pass2
+    client:
+      oauth:
+        owntokens:
+        - id: default
+          idpwellknownurl: ""
+          clientid: test client ID
+          clientsecret: some secret
+          username: test username
+          password: testpassword
+        - id: exsternalApi
+          idpwellknownurl: ""
+          clientid: remoteClientID
+          clientsecret: remote secret
+          username: test username
+          password: testpassword
+  vault:
+    enabled: true
+    addresslist:
+      - 'https://localhost:8200'
+    InsecureSkipVerify: true
+    IsLocalAgent: false
+    MaxRetries: 2
+    cacert: ''
+    timeoutSeconds: 10
+    Token:
+      enabled: false
+      #      This must be empty if you want to use the token here in the config.
+      #      The token path will be used first
+      TokenPath: ''
+      token: ""
+    Cert:
+      enabled: true
+      CertFile: './client.cer'
+      KeyFile: './client.key'
+
+
+componentconfigexample:
+  name: my custom config
+  port: 9001
