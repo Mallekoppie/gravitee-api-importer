@@ -16,6 +16,24 @@ func TestApiImport(t *testing.T) {
 	log.Println("Imported GUID: ", response.ID)
 }
 
+func TestGetAPI(t *testing.T) {
+	api, err := GetAPI("4bd314bf-1ebd-4ac0-9314-bf1ebd9ac09b")
+	if err != nil {
+		log.Println("Error getting API", err.Error())
+		t.Fail()
+	}
+
+	log.Println("Returned API: ", api.ID)
+}
+
+func TestUpdatePath(t *testing.T) {
+	err := UpdateProxyPath("1ef3455f-9ae2-4d8d-b345-5f9ae29d8da4", "/updatedfromunittest")
+	if err != nil {
+		log.Println("Error updating path", err.Error())
+		t.Fail()
+	}
+}
+
 var apiToImport = `---
 swagger: "2.0"
 info:

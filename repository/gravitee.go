@@ -20,11 +20,14 @@ var (
 
 	ErrGraviteeIncorrectResponseCode = errors.New("Incorrect response code")
 	ErrGraviteeAPIPathAlreadyInUse   = errors.New("API Path already used by another API")
+	ErrGraviteeProxyPathInvalid      = errors.New("Proxy path invalid")
 
 	//	TODO: Must be moved to config
 	graviteeManagementAPIHost string = "http://localhost:8083"
 	graviteeUsername          string = "admin"
 	graviteePassword          string = "admin"
+	graviteeOrganizationId    string = "DEFAULT"
+	graviteeEnvironmentId     string = "DEFAULT"
 )
 
 const (
@@ -66,7 +69,7 @@ func ImportAPIContract(contract string) (importApiResponse ImportAPIResponse, er
 	}
 	bodyData := bytes.NewBuffer(data)
 
-	serverUrl := fmt.Sprintf("%s/management/organizations/DEFAULT/environments/DEFAULT/apis/import/swagger?definitionVersion=2.0.0", graviteeManagementAPIHost)
+	serverUrl := fmt.Sprintf("%s/management/organizations/%s/environments/%s/apis/import/swagger?definitionVersion=2.0.0", graviteeManagementAPIHost, graviteeOrganizationId, graviteeEnvironmentId)
 
 	req, err := http.NewRequest(http.MethodPost, serverUrl, bodyData)
 
@@ -118,4 +121,102 @@ func ImportAPIContract(contract string) (importApiResponse ImportAPIResponse, er
 	}
 
 	return importApiResponse, nil
+}
+
+func GetAPI(apiId string) (api GetAPIResponse, err error) {
+	serverUrl := fmt.Sprintf("%s/management/organizations/%s/environments/%s/apis/%s", graviteeManagementAPIHost, graviteeOrganizationId, graviteeEnvironmentId, apiId)
+
+	request, err := http.NewRequest(http.MethodGet, serverUrl, nil)
+	if err != nil {
+		platform.Logger.Info("Creating GetAPI Request", zap.Error(err))
+		return
+	}
+	request.SetBasicAuth(graviteeUsername, graviteePassword)
+
+	response, err := httpClient.Do(request)
+	defer response.Body.Close()
+	if err != nil {
+		platform.Logger.Error("Calling Get API", zap.Error(err))
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		platform.Logger.Error("Get API returned incorrect response code", zap.Int("status_code_expected", http.StatusOK),
+			zap.Int("status_code_actual", response.StatusCode))
+		return
+	}
+	api = GetAPIResponse{}
+
+	responseData, err := io.ReadAll(response.Body)
+	if err != nil {
+		platform.Logger.Error("Reading Get API Response", zap.Error(err))
+		return
+	}
+
+	api = GetAPIResponse{}
+
+	err = json.Unmarshal(responseData, &api)
+	if err != nil {
+		platform.Logger.Error("Unmarshalling Get API Response", zap.Error(err))
+		return
+	}
+
+	return api, nil
+}
+
+func UpdateProxyPath(apiId string, proxyPath string) (err error) {
+	startLetter := proxyPath[:1]
+	if startLetter != "/" {
+		platform.Logger.Error("Invalid Proxy path for update", zap.String("api_id", apiId), zap.String("proxy_path", proxyPath))
+
+	}
+
+	api, err := GetAPI(apiId)
+	if err != nil {
+		platform.Logger.Error("Retrieving API before updating the proxy path")
+		return err
+	}
+
+	updateRequest := api.MapToUpdateDeploymentPathRequest()
+	updateRequest.Proxy.VirtualHosts[0].Path = proxyPath
+	updateRequestData, err := json.Marshal(updateRequest)
+	if err != nil {
+		platform.Logger.Error("Error marshalling update deployment request", zap.Error(err))
+		return
+	}
+
+	buffer := bytes.NewBuffer(updateRequestData)
+
+	serverUrl := fmt.Sprintf("%s/management/organizations/%s/environments/%s/apis/%s", graviteeManagementAPIHost, graviteeOrganizationId, graviteeEnvironmentId, apiId)
+
+	request, err := http.NewRequest(http.MethodPut, serverUrl, buffer)
+	if err != nil {
+		platform.Logger.Error("Creating new update path request", zap.Error(err))
+		return
+	}
+
+	request.SetBasicAuth(graviteeUsername, graviteePassword)
+	request.Header.Add("content-type", "application/json;charset=UTF-8")
+	request.Header.Add("accept", "application/json")
+
+	response, err := httpClient.Do(request)
+	defer response.Body.Close()
+	if err != nil {
+		platform.Logger.Error("Error calling API to update path", zap.String("api_id", apiId), zap.Error(err))
+		return
+	}
+	responseData, err := io.ReadAll(response.Body)
+	if err != nil {
+		platform.Logger.Error("Update path read response body", zap.Error(err))
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		platform.Logger.Error("Update Path incorrect response", zap.Int("status_code_expected", http.StatusOK), zap.Int("status_code_actual", response.StatusCode))
+		return ErrGraviteeIncorrectResponseCode
+	}
+
+	platform.Logger.Info("Path update successfull", zap.String("api_id", apiId), zap.String("proxy_path", proxyPath), zap.String("response_body", string(responseData)))
+
+	return
 }
