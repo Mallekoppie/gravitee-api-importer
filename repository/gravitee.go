@@ -220,3 +220,134 @@ func UpdateProxyPath(apiId string, proxyPath string) (err error) {
 
 	return
 }
+
+func PublishApi(apiId string) (err error) {
+	api, err := GetAPI(apiId)
+	if err != nil {
+		platform.Logger.Error("Retrieving API before Publishing API")
+		return err
+	}
+
+	updateRequest := api.MapToUpdateDeploymentPathRequest()
+	updateRequest.LifecycleState = "published"
+	updateRequestData, err := json.Marshal(updateRequest)
+	if err != nil {
+		platform.Logger.Error("Error marshalling Publish API request", zap.Error(err))
+		return
+	}
+
+	buffer := bytes.NewBuffer(updateRequestData)
+
+	serverUrl := fmt.Sprintf("%s/management/organizations/%s/environments/%s/apis/%s", graviteeManagementAPIHost, graviteeOrganizationId, graviteeEnvironmentId, apiId)
+
+	request, err := http.NewRequest(http.MethodPut, serverUrl, buffer)
+	if err != nil {
+		platform.Logger.Error("Creating new Publish API request", zap.Error(err))
+		return
+	}
+
+	request.SetBasicAuth(graviteeUsername, graviteePassword)
+	request.Header.Add("content-type", "application/json;charset=UTF-8")
+	request.Header.Add("accept", "application/json")
+
+	response, err := httpClient.Do(request)
+	defer response.Body.Close()
+	if err != nil {
+		platform.Logger.Error("Error calling API to Publish API", zap.String("api_id", apiId), zap.Error(err))
+		return
+	}
+	responseData, err := io.ReadAll(response.Body)
+	if err != nil {
+		platform.Logger.Error("Publish API read response body", zap.Error(err))
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		platform.Logger.Error("Publish API incorrect response", zap.Int("status_code_expected", http.StatusOK), zap.Int("status_code_actual", response.StatusCode))
+		return ErrGraviteeIncorrectResponseCode
+	}
+
+	platform.Logger.Info("Publish successfull", zap.String("api_id", apiId), zap.String("response_body", string(responseData)))
+
+	return
+}
+
+func PublishPage(apiId string) (err error) {
+	serverUrl := fmt.Sprintf("%s/management/organizations/%s/environments/%s/apis/%s/pages/?root=true", graviteeManagementAPIHost, graviteeOrganizationId, graviteeEnvironmentId, apiId)
+
+	request, err := http.NewRequest(http.MethodGet, serverUrl, nil)
+	if err != nil {
+		platform.Logger.Info("Creating GetAPI Request", zap.Error(err))
+		return
+	}
+	request.SetBasicAuth(graviteeUsername, graviteePassword)
+	request.Header.Add("accept", "application/json")
+
+	response, err := httpClient.Do(request)
+	defer response.Body.Close()
+	if err != nil {
+		platform.Logger.Error("Calling Get API", zap.Error(err))
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		platform.Logger.Error("Get API returned incorrect response code", zap.Int("status_code_expected", http.StatusOK),
+			zap.Int("status_code_actual", response.StatusCode))
+		return
+	}
+
+	responseData, err := io.ReadAll(response.Body)
+	if err != nil {
+		platform.Logger.Error("Reading Get API Response", zap.Error(err))
+		return
+	}
+
+	api := GetPagesResponse{}
+	err = json.Unmarshal(responseData, &api)
+	if err != nil {
+		platform.Logger.Error("Unmarshalling Get API Response", zap.Error(err))
+		return
+	}
+
+	var pageId string
+	for _, v := range api {
+		if v.Type == "SWAGGER" {
+			pageId = v.ID
+		}
+	}
+
+	updateRequestBody := PublishPageRequest{Published: true}
+
+	updateRequestData, err := json.Marshal(updateRequestBody)
+	if err != nil {
+		platform.Logger.Error("Marchalling for page publish", zap.Error(err))
+		return
+	}
+
+	buffer := bytes.NewBuffer(updateRequestData)
+
+	pageUpdateUrl := fmt.Sprintf("%s/management/organizations/%s/environments/%s/apis/%s/pages/%s", graviteeManagementAPIHost, graviteeOrganizationId, graviteeEnvironmentId, apiId, pageId)
+
+	updateRequest, err := http.NewRequest(http.MethodPatch, pageUpdateUrl, buffer)
+	if err != nil {
+		platform.Logger.Error("Creating new request for page update", zap.Error(err))
+		return
+	}
+
+	updateRequest.SetBasicAuth(graviteeUsername, graviteePassword)
+	updateRequest.Header.Add("content-type", "application/json;charset=UTF-8")
+	updateRequest.Header.Add("accept", "application/json")
+
+	updateResponse, err := httpClient.Do(updateRequest)
+	if err != nil {
+		platform.Logger.Error("Error calling publish page", zap.Error(err))
+		return
+	}
+
+	if updateResponse.StatusCode != http.StatusOK {
+		platform.Logger.Error("Incorrect response code for publish page")
+		return
+	}
+
+	return
+}

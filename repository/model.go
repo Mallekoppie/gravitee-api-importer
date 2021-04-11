@@ -180,7 +180,7 @@ type GetAPIResponse struct {
 	BackgroundURL                  string `json:"background_url"`
 }
 
-type UpdateDeploymentPathRequest struct {
+type UpdateDeploymentRequest struct {
 	Name        string        `json:"name"`
 	Version     string        `json:"version"`
 	Description string        `json:"description"`
@@ -253,8 +253,8 @@ type UpdateDeploymentPathRequest struct {
 	DisableMembershipNotifications bool   `json:"disable_membership_notifications"`
 }
 
-func (in *GetAPIResponse) MapToUpdateDeploymentPathRequest() UpdateDeploymentPathRequest {
-	out := UpdateDeploymentPathRequest{
+func (in *GetAPIResponse) MapToUpdateDeploymentPathRequest() UpdateDeploymentRequest {
+	out := UpdateDeploymentRequest{
 		Name:                           in.Name,
 		Version:                        in.Version,
 		Description:                    in.Description,
@@ -276,4 +276,25 @@ func (in *GetAPIResponse) MapToUpdateDeploymentPathRequest() UpdateDeploymentPat
 	}
 
 	return out
+}
+
+type GetPagesResponse []struct {
+	ID                   string        `json:"id"`
+	Name                 string        `json:"name"`
+	Type                 string        `json:"type"`
+	Order                int           `json:"order"`
+	Published            bool          `json:"published"`
+	LastModificationDate int64         `json:"lastModificationDate"`
+	ContentType          string        `json:"contentType"`
+	Homepage             bool          `json:"homepage"`
+	ParentPath           string        `json:"parentPath"`
+	GeneralConditions    bool          `json:"generalConditions"`
+	API                  string        `json:"api"`
+	Content              string        `json:"content,omitempty"`
+	LastContributor      string        `json:"lastContributor,omitempty"`
+	AttachedMedia        []interface{} `json:"attached_media,omitempty"`
+}
+
+type PublishPageRequest struct {
+	Published bool `json:"published"`
 }
